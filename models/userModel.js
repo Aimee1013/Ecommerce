@@ -1,3 +1,4 @@
+// 生成model模板的快捷键：!mdbgum
 const mongoose = require('mongoose'); // Erase if already required
 const bcrypt = require('bcrypt')
 const crypto = require('crypto')

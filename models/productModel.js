@@ -1,3 +1,4 @@
+// 生成model模板的快捷键：!mdbgum
 const mongoose = require('mongoose'); // Erase if already required
 
 // Declare the Schema of the Mongo model
@@ -39,19 +40,20 @@ var productSchema = new mongoose.Schema({
     default: 0,
     // select: false,
   },
-  images: {
-    type: Array,
-  },
-  color: {
-    type: String,
-    required: true,
-  },
+  images: [],
+  color: [],
+  tags: [],
   ratings: [
     {
       star: Number,
+      comment: String,
       postedby: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     },
-  ]
+  ],
+  totalrating: {
+    type: String,
+    default: 0,
+  },
 },
   { timestamps: true }
 );

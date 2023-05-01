@@ -1,6 +1,10 @@
 const Product = require('../models/productModel')
 const asyncHandler = require('express-async-handler');
 const slugify = require("slugify");
+const User = require('../models/userModel')
+const validateMongodbId = require('../utils/validateMongodbId')
+const { cloudinaryUploadImg, cloudinaryDeleteImg } = require('../utils/cloudinary')
+const fs = require('fs')
 
 
 // create a product
@@ -100,13 +104,111 @@ const getAllProducts = asyncHandler(async (req, res) => {
       if (skip >= productCount) throw new Error('This page does not exists')
     }
 
-
     const product = await query
     res.json(product)
   } catch (error) {
     throw new Error(error)
   }
 })
+
+
+// add wishlist
+const addToWishlist = asyncHandler(async (req, res) => {
+  const { _id } = req.user;
+  const { prodId } = req.body;
+  try {
+    const user = await User.findById(_id);
+    const alreadyAdded = user.wishlist.find(id => id.toString() === prodId)
+    if (alreadyAdded) {
+      let user = await User.findByIdAndUpdate(_id, { $pull: { wishlist: prodId } }, { new: true });
+      res.json(user);
+    } else {
+      let user = await User.findByIdAndUpdate(_id, { $push: { wishlist: prodId } }, { new: true });
+      res.json(user);
+    }
+  } catch (error) {
+    throw new Error(error)
+  }
+})
+
+
+// rating
+const rating = asyncHandler(async (req, res) => {
+  const { _id } = req.user;
+  const { star, prodId, comment } = req.body;
+  try {
+    const product = await Product.findById(prodId);
+    let alreadyRated = product.ratings.find(userId => userId.postedby.toString() === _id.toString());
+    if (alreadyRated) {
+      const updateRating = await Product.updateOne(
+        { ratings: { $elemMatch: alreadyRated } },
+        { $set: { "ratings.$.star": star, "ratings.$.comment": comment } },
+        { new: true }
+      );
+      // res.json(updateRating)
+    } else {
+      const rateProduct = await Product.findByIdAndUpdate(prodId,
+        {
+          $push: {
+            ratings: { star: star, comment: comment, postedby: _id, }
+          }
+        }, {
+        new: true,
+      });
+      // res.json(rateProduct);
+    }
+    const getAllRatings = await Product.findById(prodId);
+    let totalRating = getAllRatings.ratings.length;
+    let ratingSum = getAllRatings.ratings.map(item => item.star).reduce((prev, curr) => prev + curr, 0);
+    let actualRating = Math.round(ratingSum / totalRating)
+    let finalProduct = await Product.findByIdAndUpdate(prodId, {
+      totalrating: actualRating
+    }, {
+      new: true
+    });
+    res.json({ finalProduct })
+  } catch (error) {
+    throw new Error(error)
+  }
+});
+
+
+// upload product images
+const uploadImages = asyncHandler(async (req, res) => {
+  // console.log(req.files)
+  try {
+    const uploader = path => cloudinaryUploadImg(path, 'images');
+    const urls = [];
+    const files = req.files;
+    for (const file of files) {
+      const { path } = file;
+      const newpath = await uploader(path);
+      urls.push(newpath);
+      fs.unlinkSync(path);
+    }
+    const images = urls.map(file => {
+      return file;
+    })
+    res.json(images);
+  } catch (error) {
+    throw new Error(error)
+  }
+});
+
+
+// delete product images
+const deleteImages = asyncHandler(async (req, res) => {
+  // console.log(req.files)
+  const { id } = req.params;
+  try {
+    const deleted = cloudinaryDeleteImg(id, 'images');
+    res.json({ message: 'Deleted' });
+  } catch (error) {
+    throw new Error(error)
+  }
+});
+
+
 
 
 
@@ -117,4 +219,8 @@ module.exports = {
   getAllProducts,
   updateProduct,
   deleteProduct,
+  addToWishlist,
+  rating,
+  uploadImages,
+  deleteImages,
 }
